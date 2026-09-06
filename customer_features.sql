@@ -49,7 +49,7 @@ session_features AS (
       ON o.customer_id = s.customer_id
      AND o.session_id = s.session_id
 ),
-customer_metrics AS
+customer_metrics AS (
     SELECT
         customer_id,
         SUM(bonus_blacklist_requests_cnt) AS bonus_blacklist_requests_cnt,
@@ -58,7 +58,7 @@ customer_metrics AS
         SUM(paid_orders_cnt) AS paid_orders_cnt,
         SUM(paid_orders_without_promo_cnt) AS paid_orders_without_promo_cnt,
         SUM(paid_orders_without_promo_gmv) AS paid_orders_without_promo_gmv,
-        NULL AS converted_blacklist_sessions_cnt -- TODO: заполнить формулу
+        SUM(converted_blacklist_session_flg) AS converted_blacklist_sessions_cnt
     FROM session_features
     GROUP BY customer_id
 )
@@ -77,8 +77,13 @@ SELECT
         AS paid_orders_without_promo_gmv,
     COALESCE(m.converted_blacklist_sessions_cnt, 0)
         AS converted_blacklist_sessions_cnt,
-    NULL AS blacklist_to_order_conversion_rate -- TODO: заполнить формулу
+    CASE
+        WHEN COALESCE(m.blacklist_funnel_sessions_cnt, 0) > 0
+        THEN CAST(COALESCE(m.converted_blacklist_sessions_cnt, 0) AS FLOAT)
+             / COALESCE(m.blacklist_funnel_sessions_cnt, 0)
+        ELSE 0.0
+    END AS blacklist_to_order_conversion_rate
 FROM customer_ids AS c
 LEFT JOIN customer_metrics AS m
   ON m.customer_id = c.customer_id
-ORDER c.customer_id;
+ORDER BY c.customer_id;

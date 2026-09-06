@@ -23,12 +23,12 @@ WITH blacklist_events AS (
              )
             THEN 1
             ELSE 0
-        END AS blacklist_flg,
+        END AS blacklist_flg
     FROM logs AS l
 ),
 session_stats AS (
     SELECT
-        customer_id
+        customer_id,
         session_id,
         SUM(
             CASE
@@ -41,7 +41,7 @@ session_stats AS (
                 WHEN endpoint = 'promo' AND blacklist_flg = 1 THEN 1
                 ELSE 0
             END
-        AS promo_blacklist_requests_cnt,
+        ) AS promo_blacklist_requests_cnt,
         MIN(
             CASE
                 WHEN endpoint = 'bonuses' AND blacklist_flg = 1
@@ -49,7 +49,7 @@ session_stats AS (
             END
         ) AS first_bonus_blacklist_dttm
     FROM blacklist_events
-    GROUP BY customer_id session_id
+    GROUP BY customer_id, session_id
 ),
 promo_after_bonus AS (
     SELECT
@@ -72,5 +72,10 @@ SELECT
     promo_blacklist_requests_cnt,
     first_bonus_blacklist_dttm,
     first_promo_blacklist_after_bonus_dttm,
-    NULL AS blacklist_funnel_flg -- TODO: рассчитать прохождение двух этапов в правильном порядке
+    CASE
+        WHEN first_bonus_blacklist_dttm IS NOT NULL
+         AND first_promo_blacklist_after_bonus_dttm IS NOT NULL
+        THEN 1
+        ELSE 0
+    END AS blacklist_funnel_flg
 FROM promo_after_bonus;
